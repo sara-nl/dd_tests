@@ -23,6 +23,7 @@ tpr=`${PYTHON} -c "print (str($t+$tpr))"`
 done
 
 tpw=0
+
 for file in iowrite*
 do
 seconds=`cat $file | grep 'bytes copied' | awk '{print $7}'`
