@@ -6,7 +6,7 @@ export PATH=/usr/local/bin:$PATH
 
 tpr=0
 list=`ls -1 ioread* 2>/dev/null`
-if [ "${list}"!="x" ]; then
+if [ "x${list}" != "x" ]; then
 
     for file in ioread*
     do 
@@ -29,7 +29,8 @@ fi
 
 tpw=0
 list=`ls -1 iowrite* 2>/dev/null`
-if [ "${list}"!="x" ]; then
+echo $list
+if [ "x${list}" != "x" ]; then
 
     for file in iowrite*
     do
