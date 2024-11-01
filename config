@@ -1,0 +1,18 @@
+FILESIZE=2147483648
+BS=131072
+MAX_FILES=10
+WRITEDIR=${PWD}/writedir
+READDIR=${PWD}/inputfiles
+
+#Get Python
+PYTHON=`command -v python3 || command -v python`
+if [ "x${PYTHON}" == "x" ];then
+    echo "Python3 is not installed"
+    exit 1
+fi
+
+retval=`${PYTHON} ./check_version.py`
+if [[ ${retval} -ne 0 ]]; then
+    echo "Python3 is not installed"
+    exit 1
+fi
