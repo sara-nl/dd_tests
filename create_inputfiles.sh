@@ -3,6 +3,7 @@
 . config
 
 IF=/dev/zero
+#IF=/dev/urandom
 OF=/dev/null
 
 . config
