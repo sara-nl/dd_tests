@@ -2,6 +2,7 @@
 . config
 WRITEDIR=${WRITEDIR}/testdir.$$
 IF=/dev/zero
+#IF=/dev/urandom
 OF=/dev/null
 
 COUNT=`expr $FILESIZE \/ $BS`
