@@ -2,43 +2,33 @@
 
 . config
 
-IF=/dev/zero
-#IF=/dev/urandom
-OF=/dev/null
 
-. config
-
-seq () {
-    i=$1
-    s=""
-    while [ $i -le $2 ]
-    do
-        s=$s"$i "
-        i=`expr $i + 1`
-    done
-    echo $s
-}
-
-COUNT=`expr $FILESIZE \/ $BS`
-
-mkdir -p $READDIR
-
-usage () {
-    echo "create_inputfile.sh <number of files>" 1>&2
-}
-
-if [ $# -ne 1 ]; then
-   usage
-   exit 1
+# We need fallocate. It's the fastest way to create files.
+if command -v fallocate >/dev/null 2>&1; then
+    echo "ERROR: fallocate is not available." 1>&2
 fi
 
-nfiles=$1
 
-for i in `seq 1 ${nfiles}`
-do
+echo "Creates a pool of files for read tests."
+echo
+echo "File size" "$FILESIZE" "is loaded from the 'config' file."
+echo
+echo "The recommended pool size is 10 times available RAM."
+MEM_AVAILABLE=$(awk '/MemAvailable/ {print $2 * 1024}' /proc/meminfo)
+nfiles=$(( 10 * MEM_AVAILABLE / FILESIZE ))
+echo "On this system, that would be" "$nfiles" "files."
+echo
+echo "Creating files in $READDIR ..."
+echo
 
-echo "write: dd if=$IF of=$READDIR/file$i bs=$BS count=$COUNT &"
-dd if=$IF of=$READDIR/file$i bs=$BS count=$COUNT 2>&1 | sed -e "s/^/write $i: /" &
+mkdir -p "$READDIR"
+
+for ((i = 1; i <= nfiles; i++)); do
+    fallocate -l "$FILESIZE" "$READDIR/file$i" &
+    if (( i % 10 == 0 )) ; then
+        wait  # Wait every 10 files to avoid overwhelming the system
+    fi
+done
 wait
 
-done
+echo "Done."
