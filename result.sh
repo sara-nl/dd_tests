@@ -1,62 +1,102 @@
 #!/bin/bash
 
+usage () {
+  echo "Read results of the dd performance test."
+  echo "Usage:  ./result.sh [--skip number]"
+  echo "    --skip n: skip the first n measurements (because they might be inaccurate)"
+  echo "    --tail n: process only the last n measurements"
+  exit 1
+}
+
 . config
 
-export PATH=/usr/local/bin:$PATH
+total_mibps_read=0
+total_mibps_write=0
+verbose=false
+# By default, we want to process all records
+tailspec='+1'
 
-tpr=0
-list=`ls -1 ioread* 2>/dev/null`
-nreads=0
-if [ "x${list}" != "x" ]; then
-    for file in ioread*
-    do 
-    seconds=`cat $file | grep 'bytes copied' | awk '{print $7}'`
-    bytes=$FILESIZE
+# Process arguments
+while [ $# -gt 0 ] ; do
+  case "$1" in
+    -h | --help )
+      usage
+      ;;
+    --skip )
+      tailspec="+$(( $2 + 1 ))"
+      shift ; shift
+      ;;
+    --tail )
+      if [ "$2" -lt 10 ] ; then
+        echo "WARNING: processing fewer than 10 copy actions may give inaccurate results."
+      fi
+      tailspec="$2"
+      shift ; shift
+      ;;
+    --verbose )
+      verbose=true
+      shift
+      ;;
+    * )
+      echo "ERROR: illegal argument '$1'"
+      usage
+      ;;
+  esac
+done
 
-    if [ "x${seconds}" != "x" ]; then
-        i=0
-        ts=0
-        for s in $seconds
-        do 
-           nreads=`expr $nreads + 1`
-           i=`expr $i + 1`
-           ts=`${PYTHON} -c "print (str($s+$ts))"`
-        done
-        t=`${PYTHON} -c "print (str($i*$bytes/($ts*1024*1024)))"`
-        echo "read: $t"
-        tpr=`${PYTHON} -c "print (str($t+$tpr))"`
-    fi
-    done
 
-fi
-
-tpw=0
-list=`ls -1 iowrite* 2>/dev/null`
-nwrites=0
-if [ "x${list}" != "x" ]; then
-    for file in iowrite*
-    do
-    seconds=`cat $file | grep 'bytes copied' | awk '{print $7}'`
-    bytes=`cat $file | grep -m 1 'bytes copied' | awk '{print $3}'`
-
-    if [ "x${seconds}" != "x" ]; then
-        i=0
-        ts=0
-        for s in $seconds
-        do 
-           nwrites=`expr $nwrites + 1`
-           i=`expr $i + 1`
-           ts=`${PYTHON} -c "print (str($s+$ts))"`
-        done
-        t=`${PYTHON} -c "print (str($i*$bytes/($ts*1024*1024)))"`
-        echo write: $t
-        tpw=`${PYTHON} -c "print (str($t+$tpw))"`
-    fi
-    done
-
-fi
-
-echo $nreads files read. Avg throughput reads: $tpr MiB/s
-echo $nwrites files written. Avg throughput writes: $tpw MiB/s
+running_dd=$(pgrep '^dd' | wc -l)
+echo "Running dd tests: $running_dd"
 echo
-echo sum: `${PYTHON} -c "print (str($tpr+$tpw))"` MiB/s
+
+shopt -s nullglob  # Enable nullglob to avoid errors when no matches
+
+for file in ioread* ; do
+  mibps=$(grep 'bytes \(.*\) copied' "$file" \
+          | tail -n "$tailspec" \
+          | awk 'BEGIN { sum = 0; sec = 0 }
+                 { sum += $1; sec += $8 }
+                 END {
+                       if (sec == 0) {
+                         printf "%.2f\n", 0;
+                       } else {
+                         printf "%.2f\n", sum / sec / 1024 / 1024;
+                       }
+                     }'
+         )
+  if $verbose ; then
+    echo "$file : $mibps"
+  fi
+  total_mibps_read=$(awk "BEGIN {print $total_mibps_read + $mibps}")
+done
+
+
+for file in iowrite* ; do
+  mibps=$(grep 'bytes \(.*\) copied' "$file" \
+          | tail -n "$tailspec" \
+          | awk 'BEGIN { sum = 0; sec = 0 }
+                 { sum += $1; sec += $8 }
+                 END {
+                       if (sec == 0) {
+                         printf "%.2f\n", 0;
+                       } else {
+                         printf "%.2f\n", sum / sec / 1024 / 1024;
+                       }
+                     }'
+         )
+  if $verbose ; then
+    echo "$file : $mibps"
+  fi
+  total_mibps_write=$(awk "BEGIN {print $total_mibps_write + $mibps}")
+done
+
+if $verbose ; then
+  echo
+fi
+
+
+echo "Total READ  : $total_mibps_read MiB/s"
+echo "Total WRITE : $total_mibps_write MiB/s"
+
+grand_total=$(awk "BEGIN {print $total_mibps_read + $total_mibps_write}")
+echo "Grand total : $grand_total MiB/s"
