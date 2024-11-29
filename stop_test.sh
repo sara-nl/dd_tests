@@ -1,8 +1,12 @@
 #!/bin/bash
 export PATH=/usr/local/bin:$PATH
 
-pids=`ps -A | grep 'read\|write'|awk '{print$1}'`
-kill -15 $pids 2>/dev/null
+for expression in '^read.sh' '^write.sh' '^dd' ; do
+  echo -n "Searching $expression procs: "
+  pgrep "$expression" | wc -l
+  echo "Killing..."
+  pkill "$expression"
+  echo
+done
 
-pids=`ps -A | grep dd |awk '{print$1}'`
-kill -15 $pids 2>/dev/null
+echo "Done."
