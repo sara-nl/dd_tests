@@ -32,8 +32,7 @@ do
   echo "write ${i}: $size bytes copied in $seconds seconds, $rate MiB/s"
 
   # Prevent partition from filling up
-  # When disk is >90% full, clean up files older than 1 hour
-  # Only check every 1000th file.
+  # For every 1000th file, clean up files older than 1 hour
   if (( i % 1000 == 0 )) ; then
     # Only start a find when there is no other find running
     if ! pgrep find ; then
