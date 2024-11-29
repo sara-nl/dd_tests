@@ -1,33 +1,36 @@
 #!/bin/bash
-. config
+
 OF=/dev/null
 
 . config
 
 MiB=1048576
 
-size=`ls -l $READDIR/file1 | awk '{print $5}'`
-size_MiB=`${PYTHON} -c "print (float($size)/$MiB)"`
+size=$(stat --format=%s "$READDIR/file1")
+size_MiB=$(awk "BEGIN { print $size / 1048576 }")
+
+if [ -z "$size_MiB" ] ; then
+  echo "WARNING: could not get file size of the inputfiles."
+  exit 1
+fi
 
 trap 'exit 0;' INT
 trap 'exit 0;' TERM
 
-nfiles=`ls -1 $READDIR/file* | wc -l`
-
 i=0
-while [ 1 ]
+while true
 do
-i=`expr $i + 1`
-a=`expr ${RANDOM} \* ${nfiles}`
-b=`expr $a / 32768`
-c=`expr $b + 1`
+  ((i++))
 
-echo "read $i: dd if=$READDIR/file$c of=$OF bs=$BS"
-t0=`${PYTHON} -c "import time; print (time.time())"`
-dd if=$READDIR/file$c of=$OF bs=$BS
-t1=`${PYTHON} -c "import time; print (time.time())"`
-seconds=`${PYTHON} -c "print ($t1 - $t0)"`
-rate=`${PYTHON} -c "print ($size_MiB/$seconds)"`
-echo read ${i}: $size bytes copied in $seconds seconds, $rate MiB/s
+  # Pick a random file from the inputfiles directory
+  random_file=$(find "$READDIR/" -type f | shuf -n 1)
+
+  echo "read $i: dd if=$random_file of=$OF bs=$BS"
+  start=$(date +%s.%N)
+  dd if="$random_file" of="$OF" bs="$BS"
+  end=$(date +%s.%N)
+  seconds=$(awk "BEGIN {print $end - $start}")
+  rate=$(awk "BEGIN {print $size_MiB / $seconds}")
+  echo "read ${i}: $size bytes copied in $seconds seconds, $rate MiB/s"
 
 done

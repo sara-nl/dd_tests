@@ -1,34 +1,65 @@
 #!/bin/bash
 
-TESTDIR=`pwd`
-
-seq () {
-    i=$1
-    s=""
-    while [ $i -le $2 ]
-    do
-        s=$s"$i "
-        i=`expr $i + 1`
-    done
-    echo $s
-}
-
 usage () {
-    echo "start_tests.sh <number of 2xread/write operations>" 1>&2
+  {
+    echo "Starts a number of parallel read and/or write processes."
+    echo
+    echo "  ./start_tests.sh"
+    echo "      --read <num of procs>"
+    echo "      --write <num of procs>"
+    echo
+    echo "Run create_inputfiles.sh first to prepare."
+    exit 1
+  } 1>&2
 }
 
-if [ $# -ne 1 ]; then
+# We need some arguments
+if [ -z "$1" ]; then
    usage
-   exit 1
 fi
 
-IOS=$1
+# Process arguments
+while [ $# -gt 0 ] ; do
+  case "$1" in
+    -h | --help )
+      usage
+      ;;
+    --read )
+      num_of_reads=$2
+      shift ; shift
+      ;;
+    --write )
+      num_of_writes=$2
+      shift ; shift
+      ;;
+    * )
+      echo "ERROR: illegal argument '$1'"
+      usage
+      ;;
+  esac
+done
 
+
+echo "Clearing logs from previous tests..."
 rm -f ioread* iowrite*
 
-for i in `seq 1 $IOS`
-do
-$TESTDIR/read.sh > $TESTDIR/ioread${i}1 2>&1 &
-$TESTDIR/read.sh > $TESTDIR/ioread${i}2 2>&1 &
-$TESTDIR/write.sh > $TESTDIR/iowrite${i} 2>&1 &
+echo "Flush & drop caches, because we want to test disk and not memory"
+echo "This may take a few seconds."
+sync
+sysctl -w vm.drop_caches=3
+echo "Flushed."
+
+echo "Starting read tests..."
+for ((i = 1; i <= num_of_reads; i++)); do
+  ./read.sh > ioread${i} 2>&1 &
+  echo -n '.'
 done
+echo
+echo "Starting write tests..."
+for ((i = 1; i <= num_of_writes; i++)); do
+  ./write.sh > iowrite${i} 2>&1 &
+  echo -n '.'
+done
+echo
+
+echo "Tests have started. Run ./result.sh to view the statistics."
